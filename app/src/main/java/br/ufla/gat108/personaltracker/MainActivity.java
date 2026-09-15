@@ -1,4 +1,4 @@
-package br.ufla.gat108.Gabriel;
+package br.ufla.gat108.personaltracker;
 
 import android.os.Bundle;
 

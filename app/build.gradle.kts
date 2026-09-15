@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "br.ufla.gat108.Gabriel"
+    namespace = "br.ufla.gat108.personaltracker"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
