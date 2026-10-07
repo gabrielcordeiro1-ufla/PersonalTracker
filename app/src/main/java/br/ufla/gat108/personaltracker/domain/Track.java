@@ -1,55 +1,114 @@
 package br.ufla.gat108.personaltracker.domain;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+/**
+ * Trajeto de capacidade fixa, implementado como buffer circular.
+ *
+ * Memória: O(capacidade), constante ao longo do tempo. Ao encher, o fix mais
+ * antigo é descartado.
+ *
+ * Complexidade:
+ *  - addFix:      O(1)
+ *  - getLength:   O(1)  (distância acumulada, inclusive dos fixes já descartados)
+ *  - getMeanSpeed O(1)  (média acumulada de todos os fixes recebidos)
+ *  - slice:       O(capacidade)
+ *  - getFixes:    O(capacidade)
+ *
+ * Esta classe ainda NÃO é thread-safe: a sincronização entra na capacidade 3.
+ * As consultas já devolvem cópias, nunca a referência interna.
+ */
 public class Track {
-    private final List<Fix> fixes;
+
+    public static final int DEFAULT_CAPACITY = 1024;
+
+    private final Fix[] buffer;
+    private int head;   // posição do fix mais antigo
+    private int size;   // quantos fixes estão guardados agora
+    private long totalAdded;
     private double totalDistanceMeters;
+    private double speedSum;
     private Fix lastFix;
 
     public Track() {
-        this.fixes = new ArrayList<>();
-        this.totalDistanceMeters = 0.0;
-        this.lastFix = null;
+        this(DEFAULT_CAPACITY);
+    }
+
+    public Track(int capacity) {
+        if (capacity <= 0) {
+            throw new InvalidTrackException("Capacidade deve ser positiva. Valor recebido: " + capacity);
+        }
+        this.buffer = new Fix[capacity];
     }
 
     public void addFix(Fix fix) {
-        if (fix == null) return;
-
-        // Se já existe um ponto anterior, calcula a distância e soma ao total
-        if (lastFix != null) {
-            totalDistanceMeters += calculateDistance(lastFix, fix);
+        if (fix == null) {
+            throw new InvalidTrackException("Fix nulo não pode ser adicionado ao trajeto.");
+        }
+        if (lastFix != null && fix.getTimestamp() < lastFix.getTimestamp()) {
+            throw new InvalidTrackException("Fix fora de ordem: timestamp " + fix.getTimestamp()
+                    + " é anterior ao último (" + lastFix.getTimestamp() + ").");
         }
 
-        fixes.add(fix);
-        this.lastFix = fix;
+        if (lastFix != null) {
+            totalDistanceMeters += GeoMath.distanceMeters(
+                    lastFix.getLatitude(), lastFix.getLongitude(),
+                    fix.getLatitude(), fix.getLongitude());
+        }
+        speedSum += fix.getVelocity();
+        totalAdded++;
+
+        if (size == buffer.length) {
+            // cheio: sobrescreve o mais antigo e avança o início
+            buffer[head] = fix;
+            head = (head + 1) % buffer.length;
+        } else {
+            buffer[(head + size) % buffer.length] = fix;
+            size++;
+        }
+        lastFix = fix;
     }
 
-    // O comprimento é devolvido em memória constante, sem varrer a lista!
+    /** Comprimento total percorrido, em metros. Não varre o buffer. */
     public double getLength() {
         return totalDistanceMeters;
     }
 
+    /** Velocidade média (m/s) de todos os fixes recebidos. Zero se vazio. */
+    public double getMeanSpeed() {
+        return totalAdded == 0 ? 0.0 : speedSum / totalAdded;
+    }
+
+    /** Fixes com timestamp em [fromTimestamp, toTimestamp], do mais antigo ao mais novo. */
+    public List<Fix> slice(long fromTimestamp, long toTimestamp) {
+        if (fromTimestamp > toTimestamp) {
+            throw new InvalidTrackException("Intervalo inválido: início (" + fromTimestamp
+                    + ") maior que o fim (" + toTimestamp + ").");
+        }
+        List<Fix> result = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            Fix f = buffer[(head + i) % buffer.length];
+            if (f.getTimestamp() >= fromTimestamp && f.getTimestamp() <= toTimestamp) {
+                result.add(f);
+            }
+        }
+        return result;
+    }
+
+    /** Cópia dos fixes guardados, do mais antigo ao mais novo. */
     public List<Fix> getFixes() {
-        return Collections.unmodifiableList(fixes);
+        List<Fix> copy = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            copy.add(buffer[(head + i) % buffer.length]);
+        }
+        return copy;
     }
 
-    // Fórmula de Haversine para calcular a distância em metros entre duas coordenadas
-    // Feito em Java puro para não depender da biblioteca do Android na camada de domínio
-    private double calculateDistance(Fix f1, Fix f2) {
-        final double R = 6371e3; // Raio da Terra em metros
-        double lat1 = Math.toRadians(f1.getLatitude());
-        double lat2 = Math.toRadians(f2.getLatitude());
-        double deltaLat = Math.toRadians(f2.getLatitude() - f1.getLatitude());
-        double deltaLon = Math.toRadians(f2.getLongitude() - f1.getLongitude());
+    public int size() { return size; }
 
-        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-                Math.cos(lat1) * Math.cos(lat2) *
-                        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+    public int getCapacity() { return buffer.length; }
 
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
+    /** Total de fixes já recebidos, inclusive os descartados. */
+    public long getTotalAdded() { return totalAdded; }
 }
