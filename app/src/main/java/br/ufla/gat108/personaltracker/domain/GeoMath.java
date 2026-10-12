@@ -25,4 +25,27 @@ public final class GeoMath {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return EARTH_RADIUS_METERS * c;
     }
+
+    // ---- Projeção local equiretangular (válida para janelas de algumas centenas de metros) ----
+
+    /** Deslocamento para leste, em metros, de (originLat, originLon) até a longitude lon. */
+    public static double eastMeters(double originLat, double originLon, double lon) {
+        return Math.toRadians(lon - originLon) * EARTH_RADIUS_METERS * Math.cos(Math.toRadians(originLat));
+    }
+
+    /** Deslocamento para norte, em metros, de originLat até a latitude lat. */
+    public static double northMeters(double originLat, double lat) {
+        return Math.toRadians(lat - originLat) * EARTH_RADIUS_METERS;
+    }
+
+    /** Inversa de northMeters. */
+    public static double latitudeFromNorth(double originLat, double northMeters) {
+        return originLat + Math.toDegrees(northMeters / EARTH_RADIUS_METERS);
+    }
+
+    /** Inversa de eastMeters. */
+    public static double longitudeFromEast(double originLat, double originLon, double eastMeters) {
+        return originLon + Math.toDegrees(
+                eastMeters / (EARTH_RADIUS_METERS * Math.cos(Math.toRadians(originLat))));
+    }
 }
