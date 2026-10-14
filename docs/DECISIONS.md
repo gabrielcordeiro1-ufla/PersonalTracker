@@ -101,3 +101,43 @@
 - Motivo: O ContractsTest verificava lambdas criadas dentro do próprio teste, então nunca ficaria verde ao implementar as classes reais, e deixava a integração contínua vermelha na linha principal.
 - Consequências: As interfaces FixSource, Reconciler e Agent ficam sem teste próprio até a capacidade correspondente. A bateria de testes de cada capacidade segue o rigor do Anexo D.2.
 - Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-14 — Modelo Cinemático da Reconciliação
+- Data: 07/10/2026
+- Decisão: Restrição de reconciliação pela regra do trapézio, por eixo (leste e norte) e por intervalo: x[k+1] − x[k] − (v[k] + v[k+1])/2 · dt = 0. Variáveis por eixo: posições e componentes da velocidade (velocidade e rumo do Fix decompostos em leste/norte).
+- Alternativas consideradas: Restrição só com distância escalar entre fixes (não linear); reconciliar apenas a posição, sem usar a velocidade.
+- Motivo: A restrição é linear nas medidas, como o critério da capacidade 2 exige, e usa a velocidade informada pelo sensor, que é mais precisa que a posição.
+- Consequências: A regra do trapézio é aproximação, adequada a amostragem de ~1 Hz. A janela precisa de pelo menos 2 fixes. Erros de velocidade só aparecem na restrição quando a posição é precisa em relação a velocidade × dt; isso vai para a seção de limitações do relatório.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-15 — Covariância a partir da Acurácia do Sensor
+- Data: 07/10/2026
+- Decisão: Covariância diagonal. Desvio da posição por eixo = acurácia horizontal × 0,66 (o Android define a acurácia como raio de 68%). Desvio de cada componente da velocidade = speedAccuracy. Piso de 0,01 para evitar variância nula. Uma razão de otimismo, medida com o aparelho parado, pode multiplicar os desvios.
+- Alternativas consideradas: Valor fixo arbitrado para a variância; usar a acurácia diretamente como desvio por eixo.
+- Motivo: O critério exige covariância montada com a acurácia que o sensor informa. O fator 0,66 vem do raio de 68% de um erro 2D isotrópico.
+- Consequências: Usar speedAccuracy como desvio por componente é aproximação. Erros entre eixos e entre fixes são tratados como independentes. A razão de otimismo vem do NoiseCharacterizer (percentil 68 do erro observado dividido pela acurácia declarada).
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-16 — Detecção de Erro Grosseiro
+- Data: 07/10/2026
+- Decisão: Resíduo normalizado z = r / sqrt((A V Aᵀ)ᵢᵢ) com limiar 3,5. Ao disparar, identifica o fix culpado testando a remoção de cada um e escolhendo o que mais reduz o qui-quadrado total. Repete até passar no teste, com no máximo 3 remoções por janela e mínimo de 3 fixes restantes.
+- Alternativas consideradas: Limiar 3,0; teste global de qui-quadrado sem identificar o fix; identificar o fix pelos resíduos vizinhos.
+- Motivo: Em simulação com semente fixa (200 janelas limpas de 30 fixes), o limiar 3,0 gerou alarme falso em ~17% das janelas, e o 3,5 em ~2%, detectando em 100% um salto de 40 m. A remoção com qui-quadrado funciona igual para fixes do meio e das pontas.
+- Consequências: Com sensor otimista o teste dispara em fixes bons; a razão de otimismo deve ser calibrada antes. O limiar será revisto na tabela de sensibilidade da capacidade 5, com dados reais.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-17 — Contrato Reconciler com Resíduo
+- Data: 07/10/2026
+- Decisão: A interface Reconciler ganha o método residual(y, a), que devolve A·y. A implementação é WeightedLeastSquaresReconciler, que também expõe a covariância do resíduo e o qui-quadrado.
+- Alternativas consideradas: Calcular o resíduo fora da interface; criar uma interface separada.
+- Motivo: Resíduo antes e depois é a evidência central da capacidade 2, e o detector depende dele.
+- Consequências: Qualquer nova implementação de Reconciler deve implementar os dois métodos.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-18 — Projeção Local Leste/Norte
+- Data: 07/10/2026
+- Decisão: Projeção equiretangular em torno do primeiro fix da janela (GeoMath.eastMeters, northMeters e as inversas). Haversine continua para distâncias.
+- Alternativas consideradas: Reconciliar em graus; projeção UTM.
+- Motivo: Para janelas de poucas centenas de metros a diferença para o Haversine fica abaixo de 0,1 m, e a implementação é simples e testável na JVM.
+- Consequências: Não vale para janelas muito extensas ou perto dos polos.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
