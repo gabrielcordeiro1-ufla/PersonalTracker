@@ -61,3 +61,43 @@
 - Motivo: É o arranjo que melhor equilibra a contribuição atribuível no Git e o domínio da base de código. Um integrante implementa e o outro revisa criando os testes adicionais, trocando os papéis na semana seguinte. Isso prepara os dois para a arguição individual.
 - Consequências: Exigirá disciplina constante com os prazos semanais para não travar o desenvolvimento do colega nem disfarçar uma divisão por arquivo.
 - Decidido por: Gabriel e Luís Otávio, em 15/09.
+
+## D-09 — Estrutura do Trajeto (Track)
+- Data: 07/10/2026
+- Decisão: Track como buffer circular de capacidade fixa (padrão de 1024 fixes). Comprimento e velocidade média mantidos por acumuladores.
+- Alternativas consideradas: ArrayList com crescimento ilimitado; Deque/LinkedList com descarte manual.
+- Motivo: A capacidade 1 exige memória constante e consultas em tempo linear. Com o buffer circular, `addFix`, `getLength` e `getMeanSpeed` são O(1), e `slice` e `getFixes` são O(capacidade). A versão com ArrayList crescia sem limite e não atendia ao critério.
+- Consequências: Fixes antigos são descartados ao encher o buffer. O comprimento continua contando a distância dos fixes descartados, mas o `slice` só enxerga o que ainda está guardado. A capacidade padrão pode ser ajustada depois. A sincronização (região crítica) fica para a capacidade 3; até lá, as consultas já devolvem cópias.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-10 — Política para Fixes Inválidos ou Fora de Ordem
+- Data: 07/10/2026
+- Decisão: O Track rejeita fix nulo e fix com timestamp anterior ao último, lançando InvalidTrackException (fail-fast). Timestamps iguais são aceitos.
+- Alternativas consideradas: Ignorar silenciosamente o fix inválido; reordenar os fixes ao inserir.
+- Motivo: A reconciliação (capacidade 2) assume sequência cronológica e dt maior ou igual a zero. Ignorar em silêncio esconderia falhas do sensor, e reordenar custaria mais do que O(1) por inserção.
+- Consequências: O serviço de aquisição (capacidade 4) deve capturar a exceção sem derrubar a coleta e contar a ocorrência. O reconciliador precisa tratar dt igual a zero.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-11 — Fix com Acurácia de Velocidade e Rumo
+- Data: 07/10/2026
+- Decisão: Fix passa a guardar `speedAccuracy` (m/s) e `bearing` (graus, em [0, 360)), além da acurácia horizontal. Construtor com 7 parâmetros.
+- Alternativas consideradas: Manter só a acurácia horizontal e arbitrar a covariância da velocidade; usar apenas a velocidade escalar, sem rumo.
+- Motivo: O critério da capacidade 2 exige covariância montada com a acurácia que o sensor informa, não com valor arbitrado. A acurácia de velocidade é o motivo do minSdk 26 (D-07). O rumo permite decompor a velocidade em componentes leste e norte, mantendo a restrição de reconciliação linear nas medidas.
+- Consequências: O FixSource e o leitor de registros precisam preencher os dois campos. O formato GPX não traz a acurácia de velocidade diretamente, então a fonte desses valores nos ensaios reproduzíveis (capacidades 2 e 5) deve ser definida e registrada aqui. O FixTest foi reescrito para o novo construtor.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-12 — Place, Event e GeoMath no Domínio Mínimo
+- Data: 07/10/2026
+- Decisão: Incluir Place (círculo com centro e raio), Event (tipo, instante, posição e detalhe; tipos GROSS_ERROR, STOP e SPEED_EXCEEDED) e GeoMath com distância pela fórmula de Haversine, todos em Java puro.
+- Alternativas consideradas: Deixar Place e Event para semanas posteriores; Place como polígono; distância euclidiana sobre graus.
+- Motivo: A proposta declara Fix, Track, Place e Event na capacidade 1, e a ficha aprovada vale como contrato. Haversine sem dependência de Android roda nos testes de unidade na JVM, e a distância euclidiana sobre graus distorce a longitude.
+- Consequências: O conjunto de tipos de Event pode mudar com nova entrada neste registro. Place pode ganhar campos (como contagem de visitas) na capacidade 7.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-13 — Estratégia de Testes dos Contratos
+- Data: 07/10/2026
+- Decisão: Remover ContractsTest e ExampleUnitTest. Os testes passam a ser escritos por capacidade, contra as implementações reais.
+- Alternativas consideradas: Manter o ContractsTest falhando como etapa de TDD.
+- Motivo: O ContractsTest verificava lambdas criadas dentro do próprio teste, então nunca ficaria verde ao implementar as classes reais, e deixava a integração contínua vermelha na linha principal.
+- Consequências: As interfaces FixSource, Reconciler e Agent ficam sem teste próprio até a capacidade correspondente. A bateria de testes de cada capacidade segue o rigor do Anexo D.2.
+- Decidido por: Gabriel e Luís Otávio, em 07/10.
