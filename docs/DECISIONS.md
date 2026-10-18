@@ -141,3 +141,35 @@
 - Motivo: Para janelas de poucas centenas de metros a diferença para o Haversine fica abaixo de 0,1 m, e a implementação é simples e testável na JVM.
 - Consequências: Não vale para janelas muito extensas ou perto dos polos.
 - Decidido por: Gabriel e Luís Otávio, em 07/10.
+
+## D-19 — Leitor de Registros: CSV do GPSLogger
+- Data: 11/10/2026
+- Decisão: O leitor de registros lê o CSV do GPSLogger (GpsLoggerCsvReader), pelo nome das colunas, e não o GPX. Só entram pontos do provedor "gps"; rumo ou velocidade ausentes viram 0; linhas inválidas ou fora de ordem são descartadas e contadas.
+- Alternativas consideradas: Ler o GPX; gravar os trajetos só com o app próprio.
+- Motivo: O GPX do GPSLogger não traz acurácia, velocidade nem rumo, e o CSV traz. O Android não informa rumo com o aparelho parado.
+- Consequências: O CSV não traz a acurácia de velocidade (ver D-20). A troca do GpxReader do Anexo D por este leitor é permitida desde que registrada.
+- Decidido por: Gabriel e Luís Otávio, em 11/10.
+
+## D-20 — Acurácia de Velocidade Estimada
+- Data: 11/10/2026
+- Decisão: Acurácia de velocidade (speedAccuracy) = desvio-padrão das diferenças de velocidade entre fixes consecutivos nas caminhadas, dividido por raiz de 2 (0,114 m/s).
+- Alternativas consideradas: Calibrar com o aparelho parado; valor arbitrado; usar só o app próprio.
+- Motivo: Parado, a velocidade vem sempre 0, então a calibração daria zero. A estimativa vem dos dados, e não de um valor arbitrado.
+- Consequências: É um limite superior, porque a velocidade verdadeira também varia. Nas janelas gravadas pelo AcquisitionService (capacidade 4), a acurácia lida direto do sensor substitui esta estimativa.
+- Decidido por: Gabriel e Luís Otávio, em 11/10.
+
+## D-21 — Razão de Otimismo Medida em Sessão Parada
+- Data: 11/10/2026
+- Decisão: Razão de otimismo da posição = raio de 68% observado / acurácia declarada média, medida com o aparelho parado ao ar livre (9,5 min, 291 leituras): 0,99. É usada como fator no desvio da posição.
+- Alternativas consideradas: Sessão de 1 minuto; assumir razão 1,0 sem medir.
+- Motivo: Uma sessão de 1 minuto subestima o erro, porque o erro do GPS varia devagar (autocorrelação 0,99 entre pontos seguidos).
+- Consequências: Vale para o ambiente da sessão; em outro ambiente deve ser remedida. Nas caminhadas o qui² por grau de liberdade ficou abaixo de 1 (mediana 0,39), indicando modelo conservador, discutido na seção de limitações do relatório.
+- Decidido por: Gabriel e Luís Otávio, em 11/10.
+
+## D-22 — Dados Reais, Taxa de Amostragem e Anonimização
+- Data: 11/10/2026
+- Decisão: Dados reais em src/test/resources/data: uma sessão parada de ~9,5 min e três caminhadas de ~6 min, com um ponto a cada ~2 s. As evidências usam janelas de 30 fixes. Os arquivos versionados têm a longitude deslocada por constante e horário relativo.
+- Alternativas consideradas: Versionar os arquivos originais; intervalo de 1 s.
+- Motivo: Com "Manter o GPS entre conexões" ligado, o aparelho entrega um ponto a cada 2 s (sem isso, a cada 8 s); 1 s não foi obtido. O repositório é público e o rastro de deslocamento é dado pessoal sensível (LGPD).
+- Consequências: O intervalo de 2 s entra como limitação no relatório. O teste de 30 minutos e a aquisição a 1 Hz ficam para o AcquisitionService (capacidade 4).
+- Decidido por: Gabriel e Luís Otávio, em 11/10.
