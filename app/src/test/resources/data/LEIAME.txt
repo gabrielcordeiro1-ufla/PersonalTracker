@@ -1,0 +1,5 @@
+Dados reais gravados com o GPSLogger (somente pontos do provedor GPS).
+static.csv: aparelho parado, ~9,5 min. walk1/2/3.csv: trajetos a pe, ~6 min cada. Intervalo entre pontos: ~2 s.
+Anonimizacao (LGPD): a longitude foi deslocada por uma constante (+5,0 grau), o horario foi trocado por tempo relativo
+(timestamp_ms comeca em 0) e as colunas nao usadas foram removidas. A projecao local usa so diferencas de longitude,
+entao nenhum resultado muda. Os arquivos originais ficam apenas no aparelho/maquina de quem gravou.
