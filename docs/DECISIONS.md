@@ -173,3 +173,19 @@
 - Motivo: Com "Manter o GPS entre conexões" ligado, o aparelho entrega um ponto a cada 2 s (sem isso, a cada 8 s); 1 s não foi obtido. O repositório é público e o rastro de deslocamento é dado pessoal sensível (LGPD).
 - Consequências: O intervalo de 2 s entra como limitação no relatório. O teste de 30 minutos e a aquisição a 1 Hz ficam para o AcquisitionService (capacidade 4).
 - Decidido por: Gabriel e Luís Otávio, em 11/10.
+
+## D-23 — Primitiva de Exclusão Mútua do Buffer Compartilhado
+- Data: 13/10/2026
+- Decisão: CircularTrackBuffer protege o Track com um ReentrantLock (lock/unlock em try/finally). Uma única thread escreve (aquisição); várias leem (interface e agente). Toda consulta devolve cópia, e stats() lê todos os contadores sob o mesmo lock.
+- Alternativas consideradas: synchronized; ReentrantReadWriteLock; CopyOnWriteArrayList; buffer sem lock (lock-free).
+- Motivo: A taxa de escrita é baixa (1 Hz) e as seções críticas são curtas (add é O(1); a cópia é O(capacidade), com 1024 fixes no máximo). O ReadWriteLock acrescentaria complexidade sem ganho nessa escala. O CopyOnWriteArrayList copiaria tudo a cada escrita. A versão sem lock é incorreta (D-24 mostra isso com dados).
+- Consequências: O Track nunca deve ser compartilhado diretamente entre threads. O escritor pode esperar o tempo de uma cópia feita por um leitor; esse bloqueio máximo deve ser medido na capacidade 6.
+- Decidido por: Gabriel e Luís Otávio, em 13/10.
+
+## D-24 — Método do Teste de Corrida
+- Data: 13/10/2026
+- Decisão: Teste de corrida com 1 escritor e 4 leitores concorrentes, buffer de 64 fixes e 30.000 escritas, executado 10 vezes e registrado uma a uma. As leituras são verificadas contra invariantes conhecidas (cópia contígua, contadores coerentes, contadores monotônicos). O mesmo teste roda também numa versão sem lock, que deve ser flagrada.
+- Alternativas consideradas: Vários escritores; teste de uma execução só; testar apenas a versão com lock.
+- Motivo: O escritor é único por projeto, então a corrida relevante é escrita contra leituras. Rodar o teste na versão sem lock mostra que ele detecta o defeito, e um teste que nunca falha não prova nada. O escritor cede a vez periodicamente para garantir a intercalação mesmo em máquina de poucos núcleos.
+- Consequências: O teste não prova ausência de corrida em geral; só que, nessas condições, 10 execuções não encontraram violação, enquanto a versão sem lock foi flagrada em todas. Vale como limitação no relatório.
+- Decidido por: Gabriel e Luís Otávio, em 13/10.
