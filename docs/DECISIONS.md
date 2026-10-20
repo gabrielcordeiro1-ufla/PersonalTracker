@@ -172,7 +172,7 @@
 - Alternativas consideradas: Versionar os arquivos originais; intervalo de 1 s.
 - Motivo: Com "Manter o GPS entre conexões" ligado, o aparelho entrega um ponto a cada 2 s (sem isso, a cada 8 s); 1 s não foi obtido. O repositório é público e o rastro de deslocamento é dado pessoal sensível (LGPD).
 - Consequências: O intervalo de 2 s entra como limitação no relatório. O teste de 30 minutos e a aquisição a 1 Hz ficam para o AcquisitionService (capacidade 4).
-- Decidido por: Gabriel e Luís Otávio, em 11/10.
+  - Decidido por: Gabriel e Luís Otávio, em 11/10.
 
 ## D-23 — Primitiva de Exclusão Mútua do Buffer Compartilhado
 - Data: 13/10/2026
@@ -188,4 +188,28 @@
 - Alternativas consideradas: Vários escritores; teste de uma execução só; testar apenas a versão com lock.
 - Motivo: O escritor é único por projeto, então a corrida relevante é escrita contra leituras. Rodar o teste na versão sem lock mostra que ele detecta o defeito, e um teste que nunca falha não prova nada. O escritor cede a vez periodicamente para garantir a intercalação mesmo em máquina de poucos núcleos.
 - Consequências: O teste não prova ausência de corrida em geral; só que, nessas condições, 10 execuções não encontraram violação, enquanto a versão sem lock foi flagrada em todas. Vale como limitação no relatório.
+- Decidido por: Gabriel e Luís Otávio, em 13/10.
+
+## D-25 — Estrutura da Aquisição em Tempo Real
+- Data: 13/10/2026
+- Decisão: O callback do GPS (HandlerThread) converte cada Location em Fix e o põe numa fila. Uma tarefa periódica de 1 s, agendada com scheduleAtFixedRate numa thread própria, esvazia a fila, entrega ao CircularTrackBuffer e mede o intervalo entre ciclos e o tempo de cada ciclo. É a única thread que escreve no buffer. A fonte de localização é o LocationManager da plataforma.
+- Alternativas consideradas: Escrever no buffer direto no callback; FusedLocationProviderClient (Google Play Services); scheduleWithFixedDelay.
+- Motivo: Uma tarefa periódica de fato, com período e prazo, é o que a análise de escalonabilidade (capacidade 6) exige, e mantém o escritor único (D-23). A fila impede perder fixes entre ciclos. A API da plataforma evita dependência de serviço externo. scheduleAtFixedRate mantém o período fixo.
+- Consequências: O GPS pode entregar a cada 1 a 2 s (o aparelho entregou a cada 2 s com o GPSLogger), então alguns ciclos não têm fix novo; isso é contado. A tarefa nunca propaga exceção, porque o executor cancelaria a tarefa periódica em silêncio. Fixes fora de ordem são descartados e contados (D-10).
+- Decidido por: Gabriel e Luís Otávio, em 13/10.
+
+## D-26 — Serviço em Primeiro Plano, Permissões e Energia
+- Data: 13/10/2026
+- Decisão: Serviço em primeiro plano do tipo location, com wake lock parcial (limite de 3 h), iniciado a partir da tela visível, com START_NOT_STICKY. Permissões na ordem: localização precisa (fine e coarse juntas), notificações (Android 13+), serviço. Não se pede ACCESS_BACKGROUND_LOCATION.
+- Alternativas consideradas: Pedir localização em segundo plano; serviço sem wake lock; START_STICKY.
+- Motivo: Um serviço do tipo location iniciado com a tela visível continua com acesso à localização com a tela bloqueada, e a permissão em segundo plano exige o usuário ir às configurações. O wake lock mantém a CPU ligada para o período fixo. Pedir fine e coarse juntas é exigência a partir do Android 12.
+- Consequências: Se o teste de 30 minutos falhar em algum fabricante, o primeiro ajuste é a otimização de bateria e o segundo, adicionar a permissão em segundo plano. O wake lock consome bateria (medida na capacidade 6).
+- Decidido por: Gabriel e Luís Otávio, em 13/10.
+
+## D-27 — Registro de Aquisição sem Coordenadas
+- Data: 13/10/2026
+- Decisão: O registro dos ciclos (um CSV por sessão, uma linha por ciclo) tem número do ciclo, hora, intervalo, tempo do ciclo, fixes novos, descartados, acurácias, tamanho do buffer e total, mas nenhuma coordenada. Fica no armazenamento externo do app.
+- Alternativas consideradas: Gravar latitude e longitude no registro; registrar só na tela.
+- Motivo: O registro só precisa provar continuidade e medir jitter. Coordenadas em claro no disco violam o requisito de segurança e privacidade (a persistência cifrada é da capacidade 9).
+- Consequências: O registro não serve como base de dados de trajetos. Os trajetos para a capacidade 7 virão da persistência cifrada ou do GPSLogger. As acurácias de cada ciclo documentam a incerteza informada pelo sensor.
 - Decidido por: Gabriel e Luís Otávio, em 13/10.
