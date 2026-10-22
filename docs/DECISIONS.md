@@ -213,3 +213,27 @@
 - Motivo: O registro só precisa provar continuidade e medir jitter. Coordenadas em claro no disco violam o requisito de segurança e privacidade (a persistência cifrada é da capacidade 9).
 - Consequências: O registro não serve como base de dados de trajetos. Os trajetos para a capacidade 7 virão da persistência cifrada ou do GPSLogger. As acurácias de cada ciclo documentam a incerteza informada pelo sensor.
 - Decidido por: Gabriel e Luís Otávio, em 13/10.
+
+## D-28 — Injeção de Falhas Determinística
+- Data: 19/10/2026
+- Decisão: FaultInjector aplica, nesta ordem, perda, ruído gaussiano (posição e velocidade) e saltos de posição. Cada tipo usa sua própria sequência pseudoaleatória derivada da semente (java.util.Random). Os saltos caem em fixes sorteados, com margem de 3 fixes nas pontas e espaçamento mínimo de 5. O primeiro e o último fix nunca são descartados pela perda.
+- Alternativas consideradas: Uma única sequência aleatória para todas as falhas; falhas em posições fixas.
+- Motivo: Com sequências separadas, ligar ou desligar um tipo de falha não muda o que os outros sorteiam, e a mesma semente reproduz o mesmo ensaio em qualquer máquina. Os saltos sorteados evitam resultado dependente de um índice escolhido a dedo.
+- Consequências: Registro curto demais para os saltos pedidos lança exceção. Os índices dos saltos valem para a lista já degradada. O teste verifica que a mesma semente dá resultado idêntico.
+- Decidido por: Gabriel e Luís Otávio, em 19/10.
+
+## D-29 — Método da Tabela de Sensibilidade
+- Data: 19/10/2026
+- Decisão: A sensibilidade é medida sobre as 17 janelas disjuntas de 30 fixes dos três trajetos reais, com 6 sementes por janela (semente da tentativa k = 20261019 + k). "Detectado" significa que o fix com salto está entre os removidos; "alarme falso" é a remoção de qualquer outro fix. Varia-se um tipo de degradação por vez.
+- Alternativas consideradas: Dados sintéticos; uma só semente; variar vários tipos de falha ao mesmo tempo.
+- Motivo: Dados reais mostram o comportamento no limite real do sensor. Variar um tipo por vez isola o efeito, e a semente declarada torna a tabela reproduzível.
+- Consequências: Com 102 tentativas por linha, as taxas têm resolução de cerca de 1 a 5 pontos percentuais. A tabela vale para o limiar 3,5 e a calibração de acurácia atual (D-16, D-21). O detector não enxerga ruído de velocidade, e isso entra nas limitações.
+- Decidido por: Gabriel e Luís Otávio, em 19/10.
+
+## D-30 — Ensaio Reprodutível no Aplicativo
+- Data: 19/10/2026
+- Decisão: Uma tela de ensaio reproduz de forma acelerada um registro real anonimizado (res/raw), com semente fixa 20261019, janelas de 30 fixes e quatro falhas pré-definidas. Mostra resíduo antes e depois, qui² e detecção por janela. A lógica fica em ReplayEngine, sem Android, e é a mesma usada nos testes.
+- Alternativas consideradas: Só testes de unidade sem tela; ensaio com parâmetros livres digitados na hora.
+- Motivo: A demonstração da AV1 exige reprodução acelerada com injeção de falha e números na tela. Falhas pré-definidas e semente fixa tornam a demonstração repetível diante da turma.
+- Consequências: O registro embutido é o da caminhada gravada com o GPSLogger, com longitude deslocada e horário relativo (D-22). A pausa entre janelas na tela é só visual.
+- Decidido por: Gabriel e Luís Otávio, em 19/10.
