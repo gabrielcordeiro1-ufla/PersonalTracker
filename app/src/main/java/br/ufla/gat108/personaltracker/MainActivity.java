@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
 
         binding.startButton.setOnClickListener(v -> onStartClicked());
         binding.stopButton.setOnClickListener(v -> stopService(new Intent(this, AcquisitionService.class)));
+        binding.replayButton.setOnClickListener(v -> startActivity(new Intent(this, ReplayActivity.class)));
     }
 
     @Override

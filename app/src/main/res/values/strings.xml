@@ -2,6 +2,14 @@
     <string name="app_name">PersonalTracker</string>
     <string name="button_start">Iniciar aquisição</string>
     <string name="button_stop">Parar</string>
+    <string name="button_replay">Ensaio de reprodução e falhas</string>
     <string name="hint_permission_denied">Permissão de localização negada. Conceda a localização precisa (não a aproximada) para adquirir pelo GPS.</string>
     <string name="hint_gps_off">O GPS está desligado. Ative a localização do aparelho.</string>
+    <string name="replay_title">Ensaio reprodutível</string>
+    <string name="replay_hint">Escolha uma falha para injetar no registro gravado. A semente é fixa: o mesmo ensaio dá sempre o mesmo resultado.</string>
+    <string name="replay_running">Executando o ensaio…</string>
+    <string name="button_clean">Sem falha</string>
+    <string name="button_jump">Salto 40 m x3</string>
+    <string name="button_noise">Ruído +4 m</string>
+    <string name="button_loss">Perda 30% + saltos</string>
 </resources>

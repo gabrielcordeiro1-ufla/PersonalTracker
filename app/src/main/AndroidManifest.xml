@@ -32,6 +32,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ReplayActivity"
+            android:exported="false" />
+
         <service
             android:name=".service.AcquisitionService"
             android:exported="false"
